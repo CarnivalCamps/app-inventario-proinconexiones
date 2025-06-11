@@ -3,7 +3,31 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getSolicitudes} from '../../services/solicitudService';
 import type { SolicitudReservaFrontend } from '../../services/solicitudService';
-// import './SolicitudesListPage.css';
+
+// Imports de MUI
+import {
+    Box, Button, Typography, Paper, Tooltip, IconButton, CircularProgress, Alert,
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+
+// Función de ayuda para dar color al estado de la solicitud
+const getStatusChipColor = (status: string) => {
+    switch (status) {
+        case 'Aprobada':
+        case 'Parcialmente Aprobada':
+        case 'Entregada':
+            return 'success';
+        case 'Pendiente':
+            return 'warning';
+        case 'Rechazada':
+        case 'Cancelada':
+            return 'error';
+        default:
+            return 'default';
+    }
+};
 
 const SolicitudesListPage: React.FC = () => {
     const [solicitudes, setSolicitudes] = useState<SolicitudReservaFrontend[]>([]);
@@ -13,8 +37,6 @@ const SolicitudesListPage: React.FC = () => {
     useEffect(() => {
         const fetchSolicitudes = async () => {
             try {
-                setIsLoading(true);
-                setError(null);
                 const data = await getSolicitudes();
                 setSolicitudes(data);
             } catch (err: any) {
@@ -26,51 +48,66 @@ const SolicitudesListPage: React.FC = () => {
         fetchSolicitudes();
     }, []);
 
-    
-
-    if (isLoading) return <p>Cargando solicitudes...</p>;
-    if (error) return <p style={{ color: 'red' }}>Error: {error}</p>;
+    if (isLoading) return <CircularProgress />;
+    if (error) return <Alert severity="error">{error}</Alert>;
 
     return (
-        <div>
-            <h2>Solicitudes de Reserva</h2>
-            <Link to="/solicitudes/nueva"> {/* <--- BOTÓN/ENLACE PARA CREAR */}
-                <button style={{ marginBottom: '20px', padding: '10px' }}>Crear Nueva Solicitud</button>
-            </Link>
+        <Paper elevation={3} sx={{ padding: '24px' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" component="h1">
+                    Solicitudes de Reserva
+                </Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    component={Link}
+                    to="/solicitudes/nueva"
+                >
+                    Nueva Solicitud
+                </Button>
+            </Box>
 
-            {solicitudes.length === 0 ? (
-                <p>No hay solicitudes para mostrar.</p>
-            ) : (
-                <table border={1} style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Fecha Solicitud</th>
-                            <th>Propósito</th>
-                            <th>Solicitante (Vendedor)</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {solicitudes.map((sol) => (
-                            <tr key={sol.id_solicitud}>
-                                <td>{sol.id_solicitud}</td>
-                                <td>{new Date(sol.fecha_solicitud).toLocaleDateString()}</td>
-                                <td>{sol.proposito_solicitud}</td>
-                                <td>{sol.vendedor?.nombre_usuario || 'N/A'}</td>
-                                <td>{sol.estado_solicitud}</td>
-                                <td>
-                                    <Link to={`/solicitudes/${sol.id_solicitud}`}>
-                                        <button>Ver Detalles</button>
-                                    </Link>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
-        </div>
+            <TableContainer component={Paper} elevation={2}>
+                <Table>
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableRow>
+                            <TableCell>ID</TableCell>
+                            <TableCell>Fecha Solicitud</TableCell>
+                            <TableCell>Propósito</TableCell>
+                            <TableCell>Solicitante</TableCell>
+                            <TableCell>Estado</TableCell>
+                            <TableCell align="center">Acciones</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {solicitudes.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={6} align="center">No hay solicitudes para mostrar.</TableCell>
+                            </TableRow>
+                        ) : (
+                            solicitudes.map((sol) => (
+                                <TableRow key={sol.id_solicitud} hover>
+                                    <TableCell>#{sol.id_solicitud}</TableCell>
+                                    <TableCell>{new Date(sol.fecha_solicitud).toLocaleDateString()}</TableCell>
+                                    <TableCell>{sol.proposito_solicitud}</TableCell>
+                                    <TableCell>{sol.vendedor?.nombre_usuario || 'N/A'}</TableCell>
+                                    <TableCell>
+                                        <Chip label={sol.estado_solicitud} color={getStatusChipColor(sol.estado_solicitud)} size="small" />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        <Tooltip title="Ver Detalles">
+                                            <IconButton component={Link} to={`/solicitudes/${sol.id_solicitud}`} color="default">
+                                                <VisibilityIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
     );
 };
 

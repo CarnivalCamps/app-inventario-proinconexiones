@@ -1,28 +1,50 @@
-// client-web/src/pages/ProductDetailPage/ProductDetailPage.tsx
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getProductoById, deleteProducto } from '../../services/productService';
-import type { ProductoFrontend,  } from '../../services/productService';
-// Podrías crear un archivo CSS: import './ProductDetailPage.css';
+import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
+import { getProductoById, deleteProducto  } from '../../services/productService';
+import type { ProductoFrontend } from '../../services/productService';
+
+// Imports de MUI
+import { 
+    Paper, 
+    Box, 
+    Typography, 
+    Grid, 
+    Divider, 
+    Button, 
+    CircularProgress, 
+    Alert, 
+    Chip 
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
+const DetailItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <Typography variant="caption" color="text.secondary" component="div">
+            {label}
+        </Typography>
+        <Typography variant="body1" component="div">
+            {value || '-'}
+        </Typography>
+    </Grid>
+);
 
 const ProductDetailPage: React.FC = () => {
-    const { id } = useParams<{ id: string }>(); // Obtiene el 'id' de los parámetros de la URL
+    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [producto, setProducto] = useState<ProductoFrontend | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState<boolean>(false);
+    const numericId = parseInt(id || '0', 10);
 
     useEffect(() => {
-        if (id) {
+        if (numericId > 0) {
             const fetchProducto = async () => {
                 try {
                     setLoading(true);
                     setError(null);
-                    const numericId = parseInt(id, 10);
-                    if (isNaN(numericId)) {
-                        throw new Error("ID de producto inválido.");
-                    }
                     const data = await getProductoById(numericId);
                     setProducto(data);
                 } catch (err: any) {
@@ -33,83 +55,135 @@ const ProductDetailPage: React.FC = () => {
             };
             fetchProducto();
         } else {
-            setError("No se especificó un ID de producto.");
+            setError("ID de producto inválido.");
             setLoading(false);
         }
-    }, [id]); // Se ejecuta cuando el componente se monta o cuando 'id' cambia
+    }, [numericId]);
+
     const handleDelete = async () => {
         if (!producto) return;
 
-        if (window.confirm(`¿Estás seguro de que deseas eliminar el producto "${producto.nombre_producto}"? Esta acción no se puede deshacer.`)) {
+        if (window.confirm(`¿Estás seguro de que deseas eliminar el producto "${producto.nombre_producto}"?`)) {
             setIsDeleting(true);
             setError(null);
             try {
                 await deleteProducto(producto.id_producto);
                 alert('Producto eliminado exitosamente.');
-                navigate('/productos'); // Redirigir a la lista de productos
+                navigate('/productos');
             } catch (err: any) {
-                setError(err.message || 'Error al eliminar el producto.');
+                setError(err.message);
                 setIsDeleting(false);
             }
-            // No es necesario setIsDeleting(false) en caso de éxito porque navegamos
         }
     };
 
-    if (loading) {
-        return <div>Cargando detalles del producto...</div>;
-    }
-
-    if (error) {
-        return <div style={{ color: 'red' }}>Error: {error}</div>;
-    }
-
-    if (!producto) {
-        return <div>Producto no encontrado.</div>;
-    }
-
-    // Estilos simples para el ejemplo
-    const detailStyles = {
-        container: { padding: '20px', border: '1px solid #ccc', borderRadius: '8px', margin: '20px' },
-        item: { marginBottom: '10px' },
-        label: { fontWeight: 'bold' as 'bold' }
-    };
-    const buttonStyles = { marginLeft: '10px', backgroundColor: 'red', color: 'white' };
+    if (loading) return <CircularProgress />;
+    if (error) return <Alert severity="error">{error}</Alert>;
+    if (!producto) return <Alert severity="warning">Producto no encontrado.</Alert>;
 
     return (
-        <div style={detailStyles.container}>
-            <h2>Detalles del Producto: {producto.nombre_producto}</h2>
-            <p style={detailStyles.item}><span style={detailStyles.label}>SKU:</span> {producto.sku}</p>
-            <p style={detailStyles.item}><span style={detailStyles.label}>Descripción Corta:</span> {producto.descripcion_corta || 'N/A'}</p>
-            <p style={detailStyles.item}><span style={detailStyles.label}>Stock Actual:</span> {producto.stock_actual}</p>
-            <p style={detailStyles.item}><span style={detailStyles.label}>Stock Mínimo:</span> {producto.stock_minimo}</p>
-            <p style={detailStyles.item}><span style={detailStyles.label}>Stock Máximo:</span> {producto.stock_maximo}</p>
-            <p style={detailStyles.item}><span style={detailStyles.label}>Proveedor:</span> {producto.id_proveedor_preferido_fk}</p>
+        <Paper elevation={3} sx={{ padding: '24px' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" component="h1">
+                    {producto.nombre_producto}
+                </Typography>
+                <Box>
+                    <Button
+                        variant="outlined"
+                        startIcon={<EditIcon />}
+                        component={RouterLink}
+                        to={`/productos/${producto.id_producto}/editar`}
+                        sx={{ mr: 1 }}
+                    >
+                        Editar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                    >
+                        {isDeleting ? <CircularProgress size={20} color="inherit" /> : 'Eliminar'}
+                    </Button>
+                </Box>
+            </Box>
+            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                SKU: {producto.sku}
+            </Typography>
+            <Divider sx={{ my: 2 }} />
 
-            <p style={detailStyles.item}><span style={detailStyles.label}>Categoría:</span> {producto.categoria?.nombre_categoria || 'N/A'}</p>
-            <p style={detailStyles.item}><span style={detailStyles.label}>Unidad Primaria:</span> {producto.unidad_medida_primaria.nombre_unidad} ({producto.unidad_medida_primaria.abreviatura})</p>
-            {producto.unidad_conteo_alternativa && (
-                <p style={detailStyles.item}>
-                    <span style={detailStyles.label}>Unidad Alternativa:</span> {producto.unidad_conteo_alternativa.nombre_unidad} ({producto.unidad_conteo_alternativa.abreviatura})
-                    <br />
-                    <span style={detailStyles.label}>Cantidad por Und. Alt.:</span> {producto.cantidad_por_unidad_alternativa}
-                </p>
-            )}
-            {/* Aquí podríamos añadir más campos y botones de Editar/Eliminar */}
-            <br />
-            <Link to={`/productos/${producto.id_producto}/editar`}> {/* <--- AÑADE ESTE ENLACE/BOTÓN */}
-                <button>Editar Producto</button>
-            </Link>
-            <br />
-            
-            <br />
-            <button onClick={handleDelete} disabled={isDeleting} style={buttonStyles}>
-                        {isDeleting ? 'Eliminando...' : 'Eliminar Producto'}
-                    </button>
-            <br />
-            <br />
-            <Link to="/productos">Volver a la lista de productos</Link>
-            <br />
-        </div>
+            <Grid container spacing={3}>
+                <Grid size={12}>
+                    <Typography variant="h6">Información General</Typography>
+                </Grid>
+
+                <DetailItem label="Descripción Corta" value={producto.descripcion_corta} />
+
+                <Grid size={12}>
+                    <Divider sx={{ my: 1 }} />
+                </Grid>
+
+                <Grid size={12}>
+                    <Typography variant="h6">Detalles de Stock</Typography>
+                </Grid>
+
+                <DetailItem 
+                    label="Stock Actual" 
+                    value={
+                        <Typography variant="h5" component="span" color="primary" sx={{ fontWeight: 'bold' }}>
+                            {producto.stock_actual}
+                        </Typography>
+                    } 
+                />
+                <DetailItem label="Stock Mínimo" value={producto.stock_minimo} />
+                <DetailItem 
+                    label="Unidad de Medida Primaria" 
+                    value={`${producto.unidad_medida_primaria.nombre_unidad} (${producto.unidad_medida_primaria.abreviatura})`} 
+                />
+
+                {producto.unidad_conteo_alternativa && (
+                    <>
+                        <DetailItem 
+                            label="Unidad de Conteo Alternativa" 
+                            value={`${producto.unidad_conteo_alternativa.nombre_unidad} (${producto.unidad_conteo_alternativa.abreviatura})`} 
+                        />
+                        <DetailItem 
+                            label="Cantidad por Und. Alternativa" 
+                            value={producto.cantidad_por_unidad_alternativa} 
+                        />
+                    </>
+                )}
+
+                <Grid size={12}>
+                    <Divider sx={{ my: 1 }} />
+                </Grid>
+
+                <Grid size={12}>
+                    <Typography variant="h6">Clasificación y Origen</Typography>
+                </Grid>
+
+                <DetailItem 
+                    label="Categoría" 
+                    value={
+                        producto.categoria 
+                            ? <Chip label={producto.categoria.nombre_categoria} color="secondary" size="small" /> 
+                            : '-'
+                    } 
+                />
+            </Grid>
+
+            <Box sx={{ mt: 4 }}>
+                <Button
+                    variant="text"
+                    startIcon={<ArrowBackIcon />}
+                    component={RouterLink}
+                    to="/productos"
+                >
+                    Volver a la lista
+                </Button>
+            </Box>
+        </Paper>
     );
 };
 

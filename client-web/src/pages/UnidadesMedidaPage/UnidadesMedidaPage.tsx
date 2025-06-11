@@ -1,16 +1,22 @@
 // client-web/src/pages/UnidadesMedidaPage/UnidadesMedidaPage.tsx
-import React, { useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import {
     getUnidadesMedida,
     createUnidadMedida,
     updateUnidadMedida,
     deleteUnidadMedida,
-    
 } from '../../services/unidadMedidaService';
 import type { UnidadMedidaFrontend, CreateUnidadMedidaPayload } from '../../services/unidadMedidaService';
 
-// import './UnidadesMedidaPage.css'; // Para estilos
+// Imports de MUI
+import {
+    Box, Button, TextField, Typography, Paper, Collapse, Alert,
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, CircularProgress
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 
 const UnidadesMedidaPage: React.FC = () => {
     const [unidades, setUnidades] = useState<UnidadMedidaFrontend[]>([]);
@@ -38,7 +44,7 @@ const UnidadesMedidaPage: React.FC = () => {
         fetchUnidades();
     }, []);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -104,72 +110,146 @@ const UnidadesMedidaPage: React.FC = () => {
         setError(null);
     };
 
-    
+    const toggleForm = () => {
+        if (isFormVisible) {
+            setIsFormVisible(false);
+            setEditingUnidad(null);
+            setError(null);
+        } else {
+            openCreateForm();
+        }
+    };
 
-    if (isLoading && unidades.length === 0) return <p>Cargando unidades de medida...</p>;
-    if (error && !isFormVisible && unidades.length === 0) return <p style={{ color: 'red' }}>Error: {error}</p>;
+    // Mostrar loading solo cuando no hay datos y está cargando
+    if (isLoading && unidades.length === 0) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    // Mostrar error solo si no hay datos y no está visible el formulario
+    if (error && !isFormVisible && unidades.length === 0) {
+        return <Alert severity="error">{error}</Alert>;
+    }
 
     return (
-        <div>
-            <h2>Gestión de Unidades de Medida</h2>
-            <button onClick={openCreateForm} style={{ marginBottom: '20px', padding: '10px' }}>
-                {isFormVisible && !editingUnidad ? 'Cerrar Formulario' : 'Crear Nueva Unidad'}
-            </button>
+        <Paper elevation={3} sx={{ padding: '24px' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" component="h1">
+                    Gestión de Unidades de Medida
+                </Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={toggleForm}
+                >
+                    {isFormVisible ? 'Ocultar Formulario' : 'Nueva Unidad de Medida'}
+                </Button>
+            </Box>
 
-            {isFormVisible && (
-                <div style={{ border: '1px solid #ccc', padding: '20px', marginTop: '20px', marginBottom: '20px' }}>
-                    <h3>{editingUnidad ? 'Editar Unidad de Medida' : 'Nueva Unidad de Medida'}</h3>
-                    <form onSubmit={handleFormSubmit}>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label htmlFor="nombre_unidad" style={{display: 'block'}}>Nombre:</label>
-                            <input type="text" id="nombre_unidad" name="nombre_unidad" value={formData.nombre_unidad} onChange={handleInputChange} required style={{width: '90%', padding: '8px'}}/>
-                        </div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label htmlFor="abreviatura" style={{display: 'block'}}>Abreviatura:</label>
-                            <input type="text" id="abreviatura" name="abreviatura" value={formData.abreviatura} onChange={handleInputChange} required style={{width: '90%', padding: '8px'}}/>
-                        </div>
-                        {error && isFormVisible && <p style={{ color: 'red' }}>{error}</p>}
-                        <button type="submit" style={{ padding: '5px 10px' }} disabled={isLoading}>
-                            {isLoading ? 'Guardando...' : (editingUnidad ? 'Actualizar Unidad' : 'Crear Unidad')}
-                        </button>
-                        {editingUnidad && (
-                            <button type="button" onClick={() => { setIsFormVisible(false); setEditingUnidad(null); setError(null);}} style={{ padding: '5px 10px', marginLeft: '5px' }}>
-                                Cancelar Edición
-                            </button>
+            <Collapse in={isFormVisible}>
+                <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                        {editingUnidad ? 'Editar Unidad de medida' : 'Crear Nueva Unidad de Medida'}
+                    </Typography>
+                    <Box component="form" onSubmit={handleFormSubmit} noValidate>
+                        <TextField
+                            margin="normal"
+                            required
+                            fullWidth
+                            id="nombre_unidad"
+                            label="Nombre de la Unidad de Medida"
+                            name="nombre_unidad"
+                            value={formData.nombre_unidad}
+                            onChange={handleInputChange}
+                            autoFocus
+                        />
+                        <TextField
+                            margin="normal"
+                            required
+                            fullWidth
+                            id="abreviatura"
+                            label="Abreviatura"
+                            name="abreviatura"
+                            value={formData.abreviatura}
+                            onChange={handleInputChange}
+                        />
+                        
+                        {error && isFormVisible && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+                        
+                        <Box sx={{ mt: 2 }}>
+                            <Button type="submit" variant="contained" disabled={isLoading}>
+                                {isLoading ? 'Guardando...' : (editingUnidad ? 'Actualizar Unidad' : 'Crear Unidad')}
+                            </Button>
+                            {editingUnidad && (
+                                <Button 
+                                    onClick={() => { 
+                                        setIsFormVisible(false); 
+                                        setEditingUnidad(null); 
+                                        setError(null);
+                                    }} 
+                                    sx={{ ml: 1 }}
+                                >
+                                    Cancelar Edición
+                                </Button>
+                            )}
+                        </Box>
+                    </Box>
+                </Paper>
+            </Collapse>
+
+            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+                Lista de Unidades Existentes
+            </Typography>
+
+            <TableContainer component={Paper} elevation={2}>
+                <Table>
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableRow>
+                            <TableCell>ID</TableCell>
+                            <TableCell>Nombre</TableCell>
+                            <TableCell>Abreviatura</TableCell>
+                            <TableCell align="right">Acciones</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {unidades.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={4} align="center">
+                                    No hay unidades de medida para mostrar.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            unidades.map((unidad) => (
+                                <TableRow key={unidad.id_unidad_medida} hover>
+                                    <TableCell>{unidad.id_unidad_medida}</TableCell>
+                                    <TableCell>{unidad.nombre_unidad}</TableCell>
+                                    <TableCell>{unidad.abreviatura}</TableCell>
+                                    <TableCell align="right">
+                                        <IconButton 
+                                            onClick={() => handleEdit(unidad)} 
+                                            color="primary" 
+                                            title="Editar"
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton 
+                                            onClick={() => handleDelete(unidad.id_unidad_medida)} 
+                                            color="error" 
+                                            title="Eliminar"
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))
                         )}
-                    </form>
-                </div>
-            )}
-
-            <h3>Lista de Unidades Existentes</h3>
-            {unidades.length === 0 && !isLoading ? (
-                <p>No hay unidades de medida para mostrar.</p>
-            ) : (
-                <table border={1} style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-                    <thead>
-                        <tr>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>ID</th>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>Nombre</th>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>Abreviatura</th>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {unidades.map((um) => (
-                            <tr key={um.id_unidad_medida}>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>{um.id_unidad_medida}</td>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>{um.nombre_unidad}</td>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>{um.abreviatura}</td>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>
-                                    <button onClick={() => handleEdit(um)} style={{ marginRight: '5px', padding: '5px 10px' }}>Editar</button>
-                                    <button onClick={() => handleDelete(um.id_unidad_medida)} style={{padding: '5px 10px', backgroundColor: 'salmon'}}>Eliminar</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
-        </div>
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
     );
 };
 

@@ -1,8 +1,34 @@
 // client-web/src/pages/ConteosPage/ConteosListPage.tsx
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getConteos, iniciarConteo} from '../../services/conteoService';
+import { getConteos, iniciarConteo } from '../../services/conteoService';
 import type { ConteoFisicoFrontend } from '../../services/conteoService';
+
+// Imports de MUI
+import {
+    Box, Button, Typography, Paper, Tooltip, IconButton, CircularProgress, Alert,
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+
+// Función de ayuda para dar color al estado del conteo
+const getStatusChipColor = (status: string) => {
+    switch (status) {
+        case 'Ajustes Aplicados':
+            return 'success';
+        case 'Iniciado':
+        case 'En Progreso':
+            return 'warning';
+        case 'Registrado':
+            return 'info';
+        case 'Cancelado':
+            return 'error';
+        default:
+            return 'default';
+    }
+};
+
 
 const ConteosListPage: React.FC = () => {
     const [conteos, setConteos] = useState<ConteoFisicoFrontend[]>([]);
@@ -22,6 +48,7 @@ const ConteosListPage: React.FC = () => {
             setIsLoading(false);
         }
     };
+    
 
     useEffect(() => {
         fetchConteos();
@@ -30,59 +57,76 @@ const ConteosListPage: React.FC = () => {
     const handleIniciarConteo = async () => {
         if (!window.confirm("¿Estás seguro de que deseas iniciar un nuevo conteo físico?")) return;
 
+        setIsLoading(true);
         try {
-            setIsLoading(true);
             const nuevoConteo = await iniciarConteo({ descripcion_motivo_conteo: `Conteo iniciado el ${new Date().toLocaleString()}`});
             alert(`Conteo #${nuevoConteo.id_conteo} iniciado exitosamente.`);
-            navigate(`/conteos/${nuevoConteo.id_conteo}`); // Navegar a la página de detalle del nuevo conteo
+            navigate(`/conteos/${nuevoConteo.id_conteo}`);
         } catch (err: any) {
             setError(err.message);
-        } finally {
-            setIsLoading(false);
+            setIsLoading(false); // Detener loading si hay error
         }
+        // No ponemos setIsLoading(false) aquí en caso de éxito porque la navegación desmontará el componente
     };
 
-    if (isLoading) return <p>Cargando conteos...</p>;
-    if (error) return <p style={{ color: 'red' }}>Error: {error}</p>;
+    if (isLoading) return <CircularProgress />;
+    if (error) return <Alert severity="error">{error}</Alert>;
 
     return (
-        <div>
-            <h2>Conteos Físicos de Inventario</h2>
-            <button onClick={handleIniciarConteo} style={{ marginBottom: '20px', padding: '10px' }} disabled={isLoading}>
-                {isLoading ? 'Iniciando...' : 'Iniciar Nuevo Conteo'}
-            </button>
+        <Paper elevation={3} sx={{ padding: '24px' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" component="h1">
+                    Conteos Físicos de Inventario
+                </Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleIniciarConteo}
+                    disabled={isLoading}
+                >
+                    {isLoading ? 'Iniciando...' : 'Iniciar Nuevo Conteo'}
+                </Button>
+            </Box>
 
-            {conteos.length === 0 ? (
-                <p>No hay conteos para mostrar.</p>
-            ) : (
-                <table border={1} style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-                    <thead>
-                        <tr>
-                            <th>ID Conteo</th>
-                            <th>Fecha Inicio</th>
-                            <th>Estado</th>
-                            <th>Responsable</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {conteos.map((conteo) => (
-                            <tr key={conteo.id_conteo}>
-                                <td>#{conteo.id_conteo}</td>
-                                <td>{new Date(conteo.fecha_inicio_conteo).toLocaleString()}</td>
-                                <td>{conteo.estado_conteo}</td>
-                                <td>{conteo.usuario_responsable?.nombre_usuario || 'N/A'}</td>
-                                <td>
-                                    <Link to={`/conteos/${conteo.id_conteo}`}>
-                                        <button>Ver Detalles</button>
-                                    </Link>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
-        </div>
+            <TableContainer component={Paper} elevation={2}>
+                <Table>
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableRow>
+                            <TableCell>ID Conteo</TableCell>
+                            <TableCell>Fecha Inicio</TableCell>
+                            <TableCell>Estado</TableCell>
+                            <TableCell>Responsable</TableCell>
+                            <TableCell align="center">Acciones</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {conteos.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} align="center">No hay conteos para mostrar.</TableCell>
+                            </TableRow>
+                        ) : (
+                            conteos.map((conteo) => (
+                                <TableRow key={conteo.id_conteo} hover>
+                                    <TableCell>#{conteo.id_conteo}</TableCell>
+                                    <TableCell>{new Date(conteo.fecha_inicio_conteo).toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        <Chip label={conteo.estado_conteo} color={getStatusChipColor(conteo.estado_conteo)} size="small" />
+                                    </TableCell>
+                                    <TableCell>{conteo.usuario_responsable?.nombre_usuario || 'N/A'}</TableCell>
+                                    <TableCell align="center">
+                                        <Tooltip title="Ver y Procesar Conteo">
+                                            <IconButton component={Link} to={`/conteos/${conteo.id_conteo}`} color="default">
+                                                <VisibilityIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
     );
 };
 

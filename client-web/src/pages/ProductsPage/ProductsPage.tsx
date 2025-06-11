@@ -1,78 +1,125 @@
 // client-web/src/pages/ProductsPage/ProductsPage.tsx
 import React, { useState, useEffect } from 'react';
-import { getProductos } from '../../services/productService';
-import type { ProductoFrontend } from '../../services/productService';
 import { Link } from 'react-router-dom';
-// Podríamos importar un archivo CSS: import './ProductsPage.css';
+import { getProductos, deleteProducto} from '../../services/productService';
+import type{ ProductoFrontend } from '../../services/productService';
+
+// Imports de MUI
+import {
+    Box, Button, Typography, Paper, Tooltip, IconButton, CircularProgress, Alert,
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const ProductsPage: React.FC = () => {
     const [productos, setProductos] = useState<ProductoFrontend[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    
+
+    const fetchProductos = async () => {
+        try {
+            const data = await getProductos();
+            setProductos(data);
+        } catch (err: any) {
+            setError(err.message || 'Ocurrió un error desconocido.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchProductos = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-                const data = await getProductos();
-                setProductos(data);
-            } catch (err: any) {
-                setError(err.message || 'Ocurrió un error desconocido.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchProductos();
-    }, []); // El array vacío [] significa que este efecto se ejecuta solo una vez, cuando el componente se monta
+    }, []);
 
-    if (loading) {
-        return <div>Cargando productos...</div>;
-    }
+    const handleDelete = async (id: number, nombre: string) => {
+        if (window.confirm(`¿Estás seguro de que deseas eliminar el producto "${nombre}"?`)) {
+            try {
+                setError(null);
+                await deleteProducto(id);
+                alert('Producto eliminado exitosamente.');
+                // Recargar la lista de productos después de eliminar
+                setLoading(true); // Mostrar feedback de carga
+                await fetchProductos();
+            } catch (err: any) {
+                setError(err.message);
+            }
+        }
+    };
 
-    if (error) {
-        return <div style={{ color: 'red' }}>Error: {error}</div>;
-    }
+    if (loading && productos.length === 0) return <CircularProgress />;
+    if (error) return <Alert severity="error">{error}</Alert>;
 
     return (
-        <div>
-            <h2>Lista de Productos</h2>
-            <Link to="/productos/nuevo"> {/* <--- AÑADE ESTE ENLACE/BOTÓN */}
-                <button style={{ marginBottom: '15px' }}>Crear Nuevo Producto</button>
-            </Link>
-            {productos.length === 0 ? (
-                <p>No hay productos para mostrar.</p>
-            ) : (
-                <table border={1} style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr>
-                            <th>SKU</th>
-                            <th>Nombre</th>
-                            <th>Stock Actual</th>
-                            <th>Categoría</th>
-                            <th>Unidad Primaria</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {productos.map((producto) => (
-                            <tr key={producto.id_producto}>
-                                <td>{producto.sku}</td>
-                                <td>
-                                    <Link to={`/productos/${producto.id_producto}`}>
-                                        {producto.nombre_producto}
-                                    </Link>
-                                </td>
-                                <td>{producto.stock_actual}</td>
-                                <td>{producto.categoria?.nombre_categoria || 'N/A'}</td>
-                                <td>{producto.unidad_medida_primaria.nombre_unidad} ({producto.unidad_medida_primaria.abreviatura})</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
-            {/* Aquí podríamos añadir un botón para "Crear Nuevo Producto" más adelante */}
-        </div>
+        <Paper elevation={3} sx={{ padding: '24px' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" component="h1">
+                    Gestión de Productos
+                </Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    component={Link}
+                    to="/productos/nuevo"
+                >
+                    Nuevo Producto
+                </Button>
+            </Box>
+
+            <TableContainer component={Paper} elevation={2}>
+                <Table>
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableRow>
+                            <TableCell>SKU</TableCell>
+                            <TableCell>Nombre</TableCell>
+                            <TableCell align="right">Stock Actual</TableCell>
+                            <TableCell>Categoría</TableCell>
+                            <TableCell>Unidad Primaria</TableCell>
+                            <TableCell align="center">Acciones</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {productos.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={6} align="center">No hay productos para mostrar.</TableCell>
+                            </TableRow>
+                        ) : (
+                            productos.map((producto) => (
+                                <TableRow key={producto.id_producto} hover>
+                                    <TableCell component="th" scope="row">
+                                        {producto.sku}
+                                    </TableCell>
+                                    <TableCell>{producto.nombre_producto}</TableCell>
+                                    <TableCell align="right">{producto.stock_actual}</TableCell>
+                                    <TableCell>{producto.categoria?.nombre_categoria || 'N/A'}</TableCell>
+                                    <TableCell>{producto.unidad_medida_primaria.abreviatura}</TableCell>
+                                    <TableCell align="center">
+                                        <Tooltip title="Ver Detalles">
+                                            <IconButton component={Link} to={`/productos/${producto.id_producto}`} color="default">
+                                                <VisibilityIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Editar">
+                                            <IconButton component={Link} to={`/productos/${producto.id_producto}/editar`} color="primary">
+                                                <EditIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Eliminar">
+                                            <IconButton onClick={() => handleDelete(producto.id_producto, producto.nombre_producto)} color="error">
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
     );
 };
 

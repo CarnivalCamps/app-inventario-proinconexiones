@@ -6,9 +6,17 @@ import {
     createProveedor,
     updateProveedor,
     deleteProveedor,
-    
 } from '../../services/proveedorService';
 import type { ProveedorFrontend, CreateProveedorPayload } from '../../services/proveedorService';
+
+// Imports de MUI
+import {
+    Box, Button, TextField, Typography, Paper, Collapse, Alert,
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, CircularProgress
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 
 const ProveedoresPage: React.FC = () => {
     const [proveedores, setProveedores] = useState<ProveedorFrontend[]>([]);
@@ -124,92 +132,202 @@ const ProveedoresPage: React.FC = () => {
         setError(null);
     };
 
-    
+    const toggleForm = () => {
+        if (isFormVisible) {
+            setIsFormVisible(false);
+            setEditingProveedor(null);
+            setError(null);
+        } else {
+            openCreateForm();
+        }
+    };
 
-    if (isLoading && proveedores.length === 0) return <p>Cargando proveedores...</p>;
-    if (error && !isFormVisible && proveedores.length === 0) return <p style={{ color: 'red' }}>Error: {error}</p>;
+    // Mostrar loading solo cuando no hay datos y está cargando
+    if (isLoading && proveedores.length === 0) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    // Mostrar error solo si no hay datos y no está visible el formulario
+    if (error && !isFormVisible && proveedores.length === 0) {
+        return <Alert severity="error">{error}</Alert>;
+    }
 
     return (
-        <div>
-            <h2>Gestión de Proveedores</h2>
-            <button onClick={openCreateForm} style={{ marginBottom: '20px', padding: '10px' }}>
-                {isFormVisible && !editingProveedor ? 'Cerrar Formulario' : 'Crear Nuevo Proveedor'}
-            </button>
+        <Paper elevation={3} sx={{ padding: '24px' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h4" component="h1">
+                    Gestión de Proveedores
+                </Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={toggleForm}
+                >
+                    {isFormVisible ? 'Ocultar Formulario' : 'Nuevo Proveedor'}
+                </Button>
+            </Box>
 
-            {isFormVisible && (
-                <div style={{ border: '1px solid #ccc', padding: '20px', marginTop: '20px', marginBottom: '20px' }}>
-                    <h3>{editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h3>
-                    <form onSubmit={handleFormSubmit}>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label htmlFor="nombre_proveedor" style={{display: 'block'}}>Nombre Proveedor:</label>
-                            <input type="text" id="nombre_proveedor" name="nombre_proveedor" value={formData.nombre_proveedor} onChange={handleInputChange} required style={{width: '90%', padding: '8px'}}/>
-                        </div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label htmlFor="contacto_nombre" style={{display: 'block'}}>Nombre Contacto:</label>
-                            <input type="text" id="contacto_nombre" name="contacto_nombre" value={formData.contacto_nombre || ''} onChange={handleInputChange} style={{width: '90%', padding: '8px'}}/>
-                        </div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label htmlFor="contacto_email" style={{display: 'block'}}>Email Contacto:</label>
-                            <input type="email" id="contacto_email" name="contacto_email" value={formData.contacto_email || ''} onChange={handleInputChange} style={{width: '90%', padding: '8px'}}/>
-                        </div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label htmlFor="contacto_telefono" style={{display: 'block'}}>Teléfono Contacto:</label>
-                            <input type="text" id="contacto_telefono" name="contacto_telefono" value={formData.contacto_telefono || ''} onChange={handleInputChange} style={{width: '90%', padding: '8px'}}/>
-                        </div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label htmlFor="direccion" style={{display: 'block'}}>Dirección:</label>
-                            <textarea id="direccion" name="direccion" value={formData.direccion || ''} onChange={handleInputChange} style={{width: '90%', padding: '8px'}} rows={2}/>
-                        </div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <label htmlFor="notas" style={{display: 'block'}}>Notas:</label>
-                            <textarea id="notas" name="notas" value={formData.notas || ''} onChange={handleInputChange} style={{width: '90%', padding: '8px'}} rows={3}/>
-                        </div>
-                        {error && isFormVisible && <p style={{ color: 'red' }}>{error}</p>}
-                        <button type="submit" style={{ padding: '5px 10px' }} disabled={isLoading}>
-                            {isLoading ? 'Guardando...' : (editingProveedor ? 'Actualizar Proveedor' : 'Crear Proveedor')}
-                        </button>
+            <Collapse in={isFormVisible}>
+                <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                    {editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+                    </Typography>
+
+                    <Box component="form" onSubmit={handleFormSubmit} noValidate>
+                    <TextField
+                        fullWidth
+                        required
+                        margin="normal"
+                        id="nombre_proveedor"
+                        label="Nombre del Proveedor"
+                        name="nombre_proveedor"
+                        value={formData.nombre_proveedor}
+                        onChange={handleInputChange}
+                    />
+
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        id="contacto_nombre"
+                        label="Nombre del Contacto"
+                        name="contacto_nombre"
+                        value={formData.contacto_nombre || ''}
+                        onChange={handleInputChange}
+                    />
+
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        type="email"
+                        id="contacto_email"
+                        label="Email del Contacto"
+                        name="contacto_email"
+                        value={formData.contacto_email || ''}
+                        onChange={handleInputChange}
+                    />
+
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        id="contacto_telefono"
+                        label="Teléfono del Contacto"
+                        name="contacto_telefono"
+                        value={formData.contacto_telefono || ''}
+                        onChange={handleInputChange}
+                    />
+
+                    <TextField
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        margin="normal"
+                        id="direccion"
+                        label="Dirección"
+                        name="direccion"
+                        value={formData.direccion || ''}
+                        onChange={handleInputChange}
+                    />
+
+                    <TextField
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        margin="normal"
+                        id="notas"
+                        label="Notas"
+                        name="notas"
+                        value={formData.notas || ''}
+                        onChange={handleInputChange}
+                    />
+
+                    {error && isFormVisible && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                        {error}
+                        </Alert>
+                    )}
+
+                    <Box sx={{ mt: 2 }}>
+                        <Button type="submit" variant="contained" disabled={isLoading}>
+                        {isLoading
+                            ? 'Guardando...'
+                            : editingProveedor
+                            ? 'Actualizar Proveedor'
+                            : 'Crear Proveedor'}
+                        </Button>
+
                         {editingProveedor && (
-                            <button type="button" onClick={() => { setIsFormVisible(false); setEditingProveedor(null); setError(null);}} style={{ padding: '5px 10px', marginLeft: '5px' }}>
-                                Cancelar Edición
-                            </button>
+                        <Button
+                            onClick={() => {
+                            setIsFormVisible(false);
+                            setEditingProveedor(null);
+                            setError(null);
+                            }}
+                            sx={{ ml: 1 }}
+                        >
+                            Cancelar Edición
+                        </Button>
                         )}
-                    </form>
-                </div>
-            )}
+                    </Box>
+                    </Box>
+                </Paper>
+            </Collapse>
 
-            <h3>Lista de Proveedores Existentes</h3>
-            {proveedores.length === 0 && !isLoading ? (
-                <p>No hay proveedores para mostrar.</p>
-            ) : (
-                <table border={1} style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-                    <thead>
-                        <tr>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>ID</th>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>Nombre</th>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>Contacto</th>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>Email</th>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>Teléfono</th>
-                            <th style={{border: '1px solid #ddd', padding: '8px', textAlign: 'left'}}>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {proveedores.map((prov) => (
-                            <tr key={prov.id_proveedor}>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>{prov.id_proveedor}</td>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>{prov.nombre_proveedor}</td>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>{prov.contacto_nombre || '-'}</td>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>{prov.contacto_email || '-'}</td>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>{prov.contacto_telefono || '-'}</td>
-                                <td style={{border: '1px solid #ddd', padding: '8px'}}>
-                                    <button onClick={() => handleEdit(prov)} style={{ marginRight: '5px', padding: '5px 10px' }}>Editar</button>
-                                    <button onClick={() => handleDelete(prov.id_proveedor)} style={{padding: '5px 10px', backgroundColor: 'salmon'}}>Eliminar</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
-        </div>
+            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+                Lista de Proveedores Existentes
+            </Typography>
+
+            <TableContainer component={Paper} elevation={2}>
+                <Table>
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableRow>
+                            <TableCell>ID</TableCell>
+                            <TableCell>Nombre</TableCell>
+                            <TableCell>Abreviatura</TableCell>
+                            <TableCell align="right">Acciones</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {proveedores.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={4} align="center">
+                                    No hay proveedores para mostrar
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            proveedores.map((unidad) => (
+                                <TableRow key={unidad.id_proveedor} hover>
+                                    <TableCell>{unidad.id_proveedor}</TableCell>
+                                    <TableCell>{unidad.nombre_proveedor}</TableCell>
+                                    <TableCell>{unidad.contacto_nombre}</TableCell>
+                                    <TableCell>{unidad.contacto_email}</TableCell>
+                                    <TableCell>{unidad.contacto_telefono}</TableCell>
+                                    <TableCell align="right">
+                                        <IconButton 
+                                            onClick={() => handleEdit(unidad)} 
+                                            color="primary" 
+                                            title="Editar"
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton 
+                                            onClick={() => handleDelete(unidad.id_proveedor)} 
+                                            color="error" 
+                                            title="Eliminar"
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
     );
 };
 

@@ -1,6 +1,6 @@
 // client-web/src/services/productService.ts
 import apiClient from './apiClient';
-
+import type { ProveedorFrontend } from './proveedorService';
 
 // Elimina esta línea que causa el conflicto:
 // import type { ProductoFrontend } from './productService';
@@ -32,7 +32,9 @@ export interface ProductoFrontend {
     unidad_medida_primaria: UnidadMedidaFrontend;
     unidad_conteo_alternativa: UnidadMedidaFrontend | null;
     cantidad_por_unidad_alternativa?: number | null;
-    // proveedor_preferido?: ProveedorFrontend | null;
+    id_proveedor: number;
+    nombre_proveedor: string;
+    proveedor_preferido?: ProveedorFrontend | null;
 }
 
 export const getProductos = async (): Promise<ProductoFrontend[]> => {
@@ -61,6 +63,7 @@ export interface CreateProductPayload {
     id_proveedor_preferido_fk?: number | null;
     id_unidad_conteo_alternativa_fk?: number | null;
     cantidad_por_unidad_alternativa?: number | null;
+    
 }
 
 export const createProducto = async (payload: CreateProductPayload): Promise<ProductoFrontend> => {

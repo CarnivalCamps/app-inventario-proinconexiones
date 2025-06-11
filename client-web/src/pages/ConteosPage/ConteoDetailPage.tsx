@@ -1,34 +1,48 @@
 // client-web/src/pages/ConteosPage/ConteoDetailPage.tsx
-import React, { useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
     getConteoById, addDetallesConteo, finalizarConteo, aplicarAjustesConteo,
-    
 } from '../../services/conteoService';
 import type {
-    
     ConteoFisicoFrontend, DetalleConteoInput, FinalizarConteoPayload
 } from '../../services/conteoService';
 import { getProductos } from '../../services/productService';
 import type { ProductoFrontend } from '../../services/productService';
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContext';
+
+// Imports de MUI
+import {
+    Paper, Box, Typography, Grid, TextField, Button, Select, MenuItem,
+    InputLabel, FormControl, CircularProgress, Alert, Chip,
+    // CORRECIÓN: Se añaden los componentes de tabla que faltaban
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow
+} from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+// CORRECIÓN: Se importa el icono que faltaba
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+
+// Función de ayuda para el color del Chip
+const getStatusChipColor = (status: string): 'success' | 'warning' | 'info' | 'error' | 'default' => {
+    switch (status) {
+        case 'Ajustes Aplicados': return 'success';
+        case 'Iniciado': case 'En Progreso': return 'warning';
+        case 'Registrado': return 'info';
+        case 'Cancelado': return 'error';
+        default: return 'default';
+    }
+};
 
 const ConteoDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
     const [conteo, setConteo] = useState<ConteoFisicoFrontend | null>(null);
-    const [productos, setProductos] = useState<ProductoFrontend[]>([]); // Para el dropdown
-
-    // Estado del formulario para añadir un nuevo detalle
-    const [newDetail, setNewDetail] = useState<{ id_producto_fk: string; cantidad: string; notas: string }>({
-        id_producto_fk: '',
-        cantidad: '',
-        notas: ''
-    });
-
-    const [isLoading, setIsLoading] = useState<boolean>(true); // Para la carga inicial de la página
-    const [isSubmitting, setIsSubmitting] = useState<boolean>(false); // Para acciones de botones
+    const [productos, setProductos] = useState<ProductoFrontend[]>([]);
+    const [newDetail, setNewDetail] = useState<{ id_producto_fk: string; cantidad: string; notas: string }>({ id_producto_fk: '', cantidad: '', notas: '' });
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
     const numericId = parseInt(id || '0', 10);
@@ -36,30 +50,30 @@ const ConteoDetailPage: React.FC = () => {
     const fetchConteoAndProducts = async () => {
         if (numericId > 0) {
             try {
-                // No establecemos isLoading a true aquí para permitir que las acciones tengan su propio estado de carga
                 setError(null);
                 const [conteoData, productosData] = await Promise.all([
                     getConteoById(numericId),
-                    getProductos() // Cargar productos para el dropdown
+                    getProductos()
                 ]);
                 setConteo(conteoData);
                 setProductos(productosData);
             } catch (err: any) {
                 setError(err.message);
             } finally {
-                setIsLoading(false); // La carga de la página inicial ha terminado
+                setIsLoading(false);
             }
         } else {
             setError("ID de conteo inválido.");
             setIsLoading(false);
         }
     };
+    // CORRECIÓN: Se eliminó una llave '}' extra que estaba aquí y rompía el componente.
 
     useEffect(() => {
         fetchConteoAndProducts();
     }, [id]);
 
-    const handleNewDetailChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const handleNewDetailChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
         const { name, value } = e.target;
         setNewDetail(prev => ({ ...prev, [name]: value }));
     };
@@ -67,10 +81,10 @@ const ConteoDetailPage: React.FC = () => {
     const handleAddDetailSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!newDetail.id_producto_fk || !newDetail.cantidad) {
-            alert("Por favor, seleccione un producto e ingrese una cantidad.");
+            setError("Por favor, seleccione un producto e ingrese una cantidad.");
             return;
         }
-        
+
         setError(null);
         setIsSubmitting(true);
 
@@ -83,8 +97,8 @@ const ConteoDetailPage: React.FC = () => {
         try {
             await addDetallesConteo(numericId, payload);
             alert("Detalle añadido/actualizado exitosamente.");
-            setNewDetail({ id_producto_fk: '', cantidad: '', notas: '' }); // Resetear formulario
-            await fetchConteoAndProducts(); // Recargar todo para ver los cambios
+            setNewDetail({ id_producto_fk: '', cantidad: '', notas: '' });
+            await fetchConteoAndProducts();
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -120,105 +134,110 @@ const ConteoDetailPage: React.FC = () => {
             finally { setIsSubmitting(false); }
         }
     };
-    
+
     const puedeProcesar = user?.rol === 'Administrador' || user?.rol === 'Almacenista';
 
-    if (isLoading) return <p>Cargando detalles del conteo...</p>;
-    if (error && !conteo) return <p style={{ color: 'red' }}>Error: {error}</p>;
-    if (!conteo) return <p>Conteo no encontrado.</p>;
+    if (isLoading) return <CircularProgress />;
+    if (error && !conteo) return <Alert severity="error">{error}</Alert>;
+    if (!conteo) return <Alert severity="warning">Conteo no encontrado.</Alert>;
 
     return (
-        <div>
-            <h2>Detalle de Conteo Físico #{conteo.id_conteo}</h2>
-            <div style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '20px' }}>
-                <p><strong>Estado:</strong> {conteo.estado_conteo}</p>
-                <p><strong>Motivo:</strong> {conteo.descripcion_motivo_conteo || 'N/A'}</p>
-                <p><strong>Responsable:</strong> {conteo.usuario_responsable.nombre_usuario}</p>
-                <p><strong>Fecha Inicio:</strong> {new Date(conteo.fecha_inicio_conteo).toLocaleString()}</p>
-                {conteo.fecha_finalizacion_conteo && <p><strong>Fecha Finalización:</strong> {new Date(conteo.fecha_finalizacion_conteo).toLocaleString()}</p>}
-                {conteo.notas_generales_conteo && <p><strong>Notas:</strong> {conteo.notas_generales_conteo}</p>}
-            </div>
+        <Paper elevation={3} sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Typography variant="h4" component="h1">
+                    Detalle de Conteo Físico #{conteo.id_conteo}
+                </Typography>
+                <Chip label={conteo.estado_conteo} color={getStatusChipColor(conteo.estado_conteo)} />
+            </Box>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Responsable:</strong> {conteo.usuario_responsable.nombre_usuario}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Fecha Inicio:</strong> {new Date(conteo.fecha_inicio_conteo).toLocaleString()}</Typography></Grid>
+                {conteo.descripcion_motivo_conteo && <Grid size={{ xs: 12 }}><Typography><strong>Motivo:</strong> {conteo.descripcion_motivo_conteo}</Typography></Grid>}
+            </Grid>
 
-            <h3>Productos Registrados en el Conteo</h3>
-            <table border={1} style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                    <tr>
-                        <th>Producto (SKU)</th>
-                        <th>Stock Teórico</th>
-                        <th>Stock Físico</th>
-                        <th>Diferencia</th>
-                        <th>Notas</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {conteo.detalles_conteo.length > 0 ? (
-                        conteo.detalles_conteo.map(detalle => (
-                            <tr key={detalle.id_detalle_conteo}>
-                                <td>{detalle.producto.nombre_producto} ({detalle.producto.sku})</td>
-                                <td>{detalle.stock_teorico_primaria}</td>
-                                <td>{detalle.stock_fisico_contado_primaria}</td>
-                                <td style={{ color: detalle.diferencia_primaria !== 0 ? 'orange' : 'inherit', fontWeight: detalle.diferencia_primaria !== 0 ? 'bold' : 'normal' }}>
-                                    {detalle.diferencia_primaria > 0 ? `+${detalle.diferencia_primaria}` : detalle.diferencia_primaria}
-                                </td>
-                                <td>{detalle.notas_detalle_conteo || '-'}</td>
-                            </tr>
-                        ))
-                    ) : (
-                        <tr>
-                            <td colSpan={5} style={{ textAlign: 'center' }}>Aún no se han añadido productos a este conteo.</td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
+            <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>Productos Registrados</Typography>
+            <TableContainer component={Paper} elevation={2}>
+                <Table>
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableRow>
+                            {/* CORRECIÓN: Se usan TableCell en lugar de <th> para las cabeceras */}
+                            <TableCell sx={{ fontWeight: 'bold' }}>Producto (SKU)</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }} align="center">Stock Teórico</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }} align="center">Stock Físico</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }} align="center">Diferencia</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Notas</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {conteo.detalles_conteo.length > 0 ? (
+                            conteo.detalles_conteo.map(detalle => (
+                                <TableRow key={detalle.id_detalle_conteo} hover>
+                                    <TableCell>{detalle.producto.nombre_producto} ({detalle.producto.sku})</TableCell>
+                                    <TableCell align="center">{detalle.stock_teorico_primaria}</TableCell>
+                                    <TableCell align="center">{detalle.stock_fisico_contado_primaria}</TableCell>
+                                    <TableCell align="center" sx={{ fontWeight: 'bold', color: detalle.diferencia_primaria === 0 ? 'inherit' : (detalle.diferencia_primaria > 0 ? 'success.main' : 'error.main') }}>
+                                        {detalle.diferencia_primaria > 0 ? `+${detalle.diferencia_primaria}` : detalle.diferencia_primaria}
+                                    </TableCell>
+                                    <TableCell>{detalle.notas_detalle_conteo || '-'}</TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow><TableCell colSpan={5} align="center">Aún no se han añadido productos a este conteo.</TableCell></TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
 
-            <hr style={{ margin: '30px 0' }}/>
-            
             {puedeProcesar && (conteo.estado_conteo === 'Iniciado' || conteo.estado_conteo === 'En Progreso') && (
-                <div style={{ border: '1px solid #007bff', padding: '15px', borderRadius: '8px' }}>
-                    <h4>Añadir o Actualizar Producto en el Conteo</h4>
-                    <p>Si selecciona un producto que ya está en la lista, se actualizará su cantidad contada.</p>
-                    <form onSubmit={handleAddDetailSubmit}>
-                        <div>
-                            <label>Producto:</label>
-                            <select name="id_producto_fk" value={newDetail.id_producto_fk} onChange={handleNewDetailChange} required>
-                                <option value="">-- Seleccione un Producto --</option>
-                                {productos.map(p => <option key={p.id_producto} value={p.id_producto}>{p.nombre_producto} ({p.sku})</option>)}
-                            </select>
-                        </div>
-                        <div style={{marginTop: '10px'}}>
-                            <label>Cantidad Física Contada (en unidad primaria):</label>
-                            <input type="number" name="cantidad" value={newDetail.cantidad} onChange={handleNewDetailChange} min="0" required />
-                        </div>
-                        <div style={{marginTop: '10px'}}>
-                            <label>Notas (opcional):</label>
-                            <textarea name="notas" value={newDetail.notas} onChange={handleNewDetailChange} rows={2} style={{width: '50%'}} />
-                        </div>
-                        {error && <p style={{ color: 'red' }}>{error}</p>}
-                        <button type="submit" disabled={isSubmitting} style={{ marginTop: '10px' }}>
-                            {isSubmitting ? 'Guardando...' : 'Añadir/Actualizar Detalle'}
-                        </button>
-                    </form>
-                </div>
+                <Paper variant="outlined" sx={{ p: 2, mt: 3 }}>
+                    <Typography variant="h6" gutterBottom>Añadir o Actualizar Producto</Typography>
+                    <Box component="form" onSubmit={handleAddDetailSubmit} noValidate>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid size={{ xs: 12, md: 5 }}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Producto</InputLabel>
+                                    <Select label="Producto" name="id_producto_fk" value={newDetail.id_producto_fk} onChange={handleNewDetailChange} required>
+                                        {productos.map(p => <MenuItem key={p.id_producto} value={p.id_producto.toString()}>{p.nombre_producto}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 3 }}>
+                                <TextField label="Cantidad Contada" type="number" name="cantidad" value={newDetail.cantidad} onChange={handleNewDetailChange} required fullWidth size="small" InputProps={{ inputProps: { min: 0 } }}/>
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <TextField label="Notas (opcional)" name="notas" value={newDetail.notas} onChange={handleNewDetailChange} fullWidth size="small"/>
+                            </Grid>
+                            <Grid size={{ xs: 12 }}>
+                                <Button type="submit" variant="contained" disabled={isSubmitting} sx={{ mt: 1 }}>
+                                    {isSubmitting ? 'Guardando...' : 'Añadir/Actualizar Detalle'}
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    </Box>
+                </Paper>
             )}
 
-            <h4 style={{marginTop: '30px'}}>Acciones del Conteo</h4>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                {puedeProcesar && (conteo.estado_conteo === 'Iniciado' || conteo.estado_conteo === 'En Progreso') && (
-                    <button onClick={handleFinalizar} disabled={isSubmitting}>{isSubmitting ? 'Procesando...' : 'Finalizar Conteo'}</button>
-                )}
-                {puedeProcesar && conteo.estado_conteo === 'Registrado' && (
-                    <button onClick={handleAplicarAjustes} disabled={isSubmitting} style={{ backgroundColor: 'lightblue' }}>
-                        {isSubmitting ? 'Aplicando...' : 'Aplicar Ajustes'}
-                    </button>
-                )}
-                {conteo.estado_conteo === 'Ajustes Aplicados' && (
-                    <p>✅ Este conteo ya ha sido procesado y los ajustes aplicados.</p>
-                )}
-            </div>
+            <Box sx={{ mt: 3, p: 2, border: '1px dashed grey', borderRadius: 2 }}>
+                <Typography variant="h6" gutterBottom>Acciones del Conteo General</Typography>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    {puedeProcesar && (conteo.estado_conteo === 'Iniciado' || conteo.estado_conteo === 'En Progreso') && (
+                        <Button onClick={handleFinalizar} variant="contained" color="info" disabled={isSubmitting}>Finalizar Conteo</Button>
+                    )}
+                    {puedeProcesar && conteo.estado_conteo === 'Registrado' && (
+                        <Button onClick={handleAplicarAjustes} variant="contained" color="success" disabled={isSubmitting}>Aplicar Ajustes al Stock</Button>
+                    )}
+                    {conteo.estado_conteo === 'Ajustes Aplicados' && (
+                        <Typography sx={{ display: 'flex', alignItems: 'center', color: 'success.main' }}><CheckCircleIcon sx={{ mr: 1 }}/> Ajustes aplicados.</Typography>
+                    )}
+                </Box>
+            </Box>
 
-            <br />
-            <Link to="/conteos">← Volver a la lista de conteos</Link>
-        </div>
+            {/* CORRECIÓN: Se usa 'Link' de react-router-dom y se coloca el botón dentro del 'Paper' principal. */}
+            <Button component={Link} to="/conteos" startIcon={<ArrowBackIcon />} sx={{ mt: 3 }}>
+                Volver a la lista de conteos
+            </Button>
+        </Paper>
     );
 };
 
