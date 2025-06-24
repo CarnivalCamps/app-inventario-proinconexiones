@@ -14,6 +14,9 @@ import movimientoRoutes from './routes/movimiento.routes';
 import solicitudRoutes from './routes/solicitud.routes';
 import conteoRoutes from './routes/conteo.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import ordenCompraRoutes from './routes/ordenCompra.routes'; 
+import ubicacionRoutes from './routes/ubicacion.routes';
+import stockRoutes from './routes/stock.routes';
 
 dotenv.config();
 
@@ -50,6 +53,9 @@ AppDataSource.initialize()
         app.use('/api/solicitudes', solicitudRoutes);
         app.use('/api/conteos', conteoRoutes);
         app.use('/api/dashboard', dashboardRoutes);
+        app.use('/api/ordenes-compra', ordenCompraRoutes);
+        app.use('/api/ubicaciones', ubicacionRoutes);
+        app.use('/api/stock', stockRoutes);
 
         app.listen(port, () => {
           console.log(`Servidor backend escuchando en http://localhost:${port} 🚀`);

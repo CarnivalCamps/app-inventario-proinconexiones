@@ -16,6 +16,8 @@ import { UnidadMedida } from "./UnidadMedida";
 import { RazonMovimiento } from "./RazonMovimiento";
 import { DetalleSolicitudReserva } from "./DetalleSolicitudReserva";
 import { DetalleConteoFisico } from "./DetalleConteoFisico"; // <--- 1. IMPORTA ESTO (si no estaba)
+import { Ubicacion } from "./Ubicacion";
+
 
 @Entity({ name: 'movimientos_inventario' })
 export class MovimientoInventario {
@@ -70,6 +72,10 @@ export class MovimientoInventario {
     @ManyToOne(() => DetalleSolicitudReserva, { nullable: true })
     @JoinColumn({ name: 'id_solicitud_reserva_detalle_fk' })
     detalle_solicitud_reserva!: DetalleSolicitudReserva | null;
+
+    @ManyToOne(() => Ubicacion, { nullable: true }) // Nullable porque movimientos antiguos pueden no tenerla
+    @JoinColumn({ name: 'id_ubicacion_fk' })
+    ubicacion!: Ubicacion | null;
 
     // --- ESTA ES LA SECCIÓN QUE CAMBIAMOS ---
     // Antes era: @Column({ type: 'integer', name: 'id_detalle_conteo_fisico_fk', nullable: true })

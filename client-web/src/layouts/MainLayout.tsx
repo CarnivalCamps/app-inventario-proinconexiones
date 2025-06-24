@@ -1,8 +1,9 @@
 // client-web/src/layouts/MainLayout.tsx
 import React from 'react';
-import { Box, AppBar, Toolbar, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography, Divider, IconButton, CssBaseline } from '@mui/material';
+import { Box, AppBar, Toolbar, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography, Divider, IconButton, CssBaseline, StepConnector } from '@mui/material';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
 
 // Importar iconos de MUI
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -15,6 +16,8 @@ import RuleFolderIcon from '@mui/icons-material/RuleFolder';
 import HistoryIcon from '@mui/icons-material/History';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import { LocationOn } from '@mui/icons-material';
 
 const drawerWidth = 240;
 
@@ -33,6 +36,9 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         { text: 'Solicitudes', icon: <AssignmentIcon />, path: '/solicitudes' },
         { text: 'Conteos Físicos', icon: <RuleFolderIcon />, path: '/conteos' },
         { text: 'Historial Movimientos', icon: <HistoryIcon />, path: '/historial-movimientos' },
+        { text: 'Órdenes de Compra', icon: <ShoppingCartIcon />, path: '/ordenes-compra' }, 
+        { text: 'Gestionar Ubicaciones', icon: <LocationOn />, path: '/ubicaciones' }, 
+        
     ];
 
     const managementItems = [

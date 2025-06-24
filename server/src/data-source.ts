@@ -18,6 +18,10 @@ import { ConteoFisico } from './entities/ConteoFisico';
 import { DetalleConteoFisico } from './entities/DetalleConteoFisico';
 import { Notificacion } from './entities/Notificacion';
 import { ConfiguracionSistema } from './entities/ConfiguracionSistema';
+import { OrdenCompra } from "./entities/OrdenCompra";
+import { DetalleOrdenCompra } from "./entities/DetalleOrdenCompra";
+import { Ubicacion } from './entities/Ubicacion';
+import { StockProducto } from './entities/StockProducto';
 
 
 
@@ -66,6 +70,10 @@ export const AppDataSource = new DataSource({
         DetalleConteoFisico,
         Notificacion,
         ConfiguracionSistema,
+        OrdenCompra, // <--- 3. AÑADE
+        DetalleOrdenCompra, 
+        Ubicacion,
+        StockProducto
     ],
 
     migrations: [],

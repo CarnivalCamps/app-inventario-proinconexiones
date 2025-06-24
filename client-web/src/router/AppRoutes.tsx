@@ -19,7 +19,10 @@ import HistorialMovimientosPage from '../pages/HistorialMovimientosPage/Historia
 import { getDashboardSummary } from '../services/dashboardService'; // Nuestro nuevo servicio
 import type { DashboardSummary } from '../services/dashboardService'; // El tipo de dato
 import MainLayout from '../layouts/MainLayout';
-
+import OrdenesCompraListPage from '../pages/OrdenesCompraPage/OrdenesCompraListPage';
+import CreateOrdenCompraPage from '../pages/OrdenesCompraPage/CreateOrdenCompraPage';
+import OrdenCompraDetailPage from '../pages/OrdenesCompraPage/OrdenCompraDetailPage';
+import UbicacionesPage from '../pages/ubicacionesPage/UbicacionesPage';
 const DashboardPage: React.FC = () => {
     const { user, logout } = useAuth();
     const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -185,6 +188,10 @@ const AppRoutes: React.FC = () => {
                 <Route path="/solicitudes" element={<SolicitudesListPage />} />
                 <Route path="/solicitudes/nueva" element={<CreateSolicitudPage />} />
                 <Route path="/solicitudes/:id" element={<SolicitudDetailPage />} />
+                <Route path="/ordenes-compra" element={<OrdenesCompraListPage />} />
+                <Route path="/ordenes-compra/nueva" element={<CreateOrdenCompraPage />} />
+                <Route path="/ordenes-compra/:id" element={<OrdenCompraDetailPage />} />
+                <Route path="/ubicaciones" element={<UbicacionesPage />} />
                 
                 {/* Rutas de conteos */}
                 <Route path="/conteos" element={<ConteosListPage />} />

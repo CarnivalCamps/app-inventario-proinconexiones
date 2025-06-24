@@ -104,3 +104,10 @@ export const deleteProducto = async (id: number): Promise<void> => {
         throw new Error(error.response?.data?.message || 'Error al eliminar el producto.');
     }
 };
+export const updateProductoUbicaciones = async (idProducto: number, ubicacionIds: number[]): Promise<void> => {
+    try {
+        await apiClient.put(`/productos/${idProducto}/ubicaciones`, { ubicacionIds });
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || 'Error al actualizar las ubicaciones del producto.');
+    }
+};

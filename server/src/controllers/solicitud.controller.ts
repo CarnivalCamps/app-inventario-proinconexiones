@@ -8,8 +8,10 @@ import { Producto } from "../entities/Producto";
 import { UnidadMedida } from "../entities/UnidadMedida";
 import { User } from "../entities/User";
 import { AuthRequest } from "../middlewares/auth.middleware";
-import { MovimientoInventario } from "../entities/MovimientoInventario"; // Asegúrate de importar MovimientoInventario
-import { TipoMovimiento } from "../entities/TipoMovimiento"; // Y TipoMovimiento
+import { MovimientoInventario } from "../entities/MovimientoInventario";
+import { TipoMovimiento } from "../entities/TipoMovimiento";
+import { StockProducto } from "../entities/StockProducto";
+import { Ubicacion } from "../entities/Ubicacion";
 
 interface DetalleSolicitudInput {
     id_producto_fk: number;
@@ -143,6 +145,7 @@ export const createSolicitudReserva = async (req: AuthRequest, res: Response): P
         }
     });
 };
+
 export const getAllSolicitudes = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const solicitudRepository = AppDataSource.getRepository(SolicitudReserva);
@@ -209,6 +212,7 @@ export const getSolicitudById = async (req: AuthRequest, res: Response): Promise
         return;
     }
 };
+
 interface DetalleAprobadoInput {
     id_detalle_solicitud: number;
     cantidad_aprobada_primaria: number;
@@ -270,7 +274,6 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response): Promise
                 //     throw new Error(`Stock insuficiente para aprobar la cantidad deseada del producto '${detalleOriginal.producto.nombre_producto}'. Solicitado: ${detalleAprobado.cantidad_aprobada_primaria}, Disponible: ${detalleOriginal.producto.stock_actual}`);
                 // }
 
-
                 detalleOriginal.cantidad_aprobada_primaria = Number(detalleAprobado.cantidad_aprobada_primaria);
                 await transactionalEntityManager.save(DetalleSolicitudReserva, detalleOriginal);
 
@@ -320,15 +323,14 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response): Promise
     }).catch(transactionError => {
         console.error("Error de la transacción general en aprobarSolicitud:", transactionError);
         if (!res.headersSent) {
-             if (transactionError instanceof Error) {
-                 res.status(500).json({ message: "Fallo la transacción al aprobar solicitud.", error: transactionError.message });
+            if (transactionError instanceof Error) {
+                res.status(500).json({ message: "Fallo la transacción al aprobar solicitud.", error: transactionError.message });
             } else {
-                 res.status(500).json({ message: "Fallo la transacción al aprobar solicitud con error desconocido." });
+                res.status(500).json({ message: "Fallo la transacción al aprobar solicitud con error desconocido." });
             }
         }
     });
 };
-
 
 export const rechazarSolicitud = async (req: AuthRequest, res: Response): Promise<void> => {
     const { id: idSolicitud } = req.params;
@@ -349,7 +351,7 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response): Promis
 
             if (!solicitud) throw new Error(`Solicitud de reserva con ID ${idSolicitud} no encontrada.`);
             if (solicitud.estado_solicitud !== 'Pendiente') {
-                 throw new Error(`La solicitud ya ha sido procesada (estado actual: ${solicitud.estado_solicitud}). No se puede rechazar.`);
+                throw new Error(`La solicitud ya ha sido procesada (estado actual: ${solicitud.estado_solicitud}). No se puede rechazar.`);
             }
 
             const almacenista = await userRepository.findOneBy({ id_usuario: id_almacenista_fk });
@@ -397,121 +399,99 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response): Promis
         }
     });
 };
+
 export const entregarSolicitud = async (req: AuthRequest, res: Response): Promise<void> => {
     const { id: idSolicitud } = req.params;
-    const { notas_entrega } = req.body; // Opcional, para notas sobre la entrega
+    const { id_ubicacion_origen, notas_entrega } = req.body;
     const id_almacenista_entrega_fk = req.user!.id;
 
-    await AppDataSource.manager.transaction(async (transactionalEntityManager) => {
-        try {
-            const solicitudRepository = transactionalEntityManager.getRepository(SolicitudReserva);
-            const detalleSolicitudRepository = transactionalEntityManager.getRepository(DetalleSolicitudReserva);
-            const productoRepository = transactionalEntityManager.getRepository(Producto);
-            const userRepository = transactionalEntityManager.getRepository(User);
-            const tipoMovimientoRepository = transactionalEntityManager.getRepository(TipoMovimiento);
-            // El repositorio de MovimientoInventario se usará para crear el nuevo movimiento
+    if (!id_ubicacion_origen) {
+        res.status(400).json({ message: "Se requiere especificar la ubicación de origen para la entrega." });
+        return;
+    }
 
-            const solicitud = await solicitudRepository.findOne({
+    await AppDataSource.manager.transaction(async (tem) => {
+        try {
+            const solicitudRepo = tem.getRepository(SolicitudReserva);
+            const productoRepo = tem.getRepository(Producto);
+            const stockProductoRepo = tem.getRepository(StockProducto);
+            const ubicacionRepo = tem.getRepository(Ubicacion);
+            const tipoMovRepo = tem.getRepository(TipoMovimiento);
+            const usuarioRepo = tem.getRepository(User);
+
+            const solicitud = await solicitudRepo.findOne({
                 where: { id_solicitud: parseInt(idSolicitud) },
-                relations: [
-                    "detalles_solicitud",
-                    "detalles_solicitud.producto",
-                    "detalles_solicitud.producto.unidad_medida_primaria", // Necesaria para el movimiento
-                    "vendedor" // Podría ser útil para la referencia del movimiento
-                ]
+                relations: ["detalles_solicitud", "detalles_solicitud.producto", "detalles_solicitud.producto.unidad_medida_primaria"]
             });
 
             if (!solicitud) throw new Error(`Solicitud de reserva con ID ${idSolicitud} no encontrada.`);
             if (!['Aprobada', 'Parcialmente Aprobada'].includes(solicitud.estado_solicitud)) {
-                throw new Error(`La solicitud no está en un estado válido para entrega (estado actual: ${solicitud.estado_solicitud}).`);
+                throw new Error(`La solicitud no está en un estado válido para entrega.`);
             }
 
-            const almacenistaEntrega = await userRepository.findOneBy({ id_usuario: id_almacenista_entrega_fk });
-            if (!almacenistaEntrega) throw new Error("Usuario (almacenista que entrega) no encontrado.");
+            const ubicacionOrigen = await ubicacionRepo.findOneBy({ id_ubicacion: id_ubicacion_origen });
+            if (!ubicacionOrigen) throw new Error(`Ubicación de origen con ID ${id_ubicacion_origen} no encontrada.`);
 
-            // Buscar un tipo de movimiento para "Salida por Solicitud" o "Salida por Venta"
-            // Es crucial que este tipo exista y tenga efecto_stock = -1
-            const tipoMovSalida = await tipoMovimientoRepository.findOneBy({ nombre_tipo: 'Salida por Venta' }); // O 'Salida por Solicitud Reserva'
-            if (!tipoMovSalida || tipoMovSalida.efecto_stock !== -1) {
-                throw new Error("No se encontró un Tipo de Movimiento adecuado para 'Salida por Venta/Solicitud' o su efecto_stock no es -1.");
-            }
+            const almacenistaEntrega = await usuarioRepo.findOneBy({ id_usuario: id_almacenista_entrega_fk });
+            if (!almacenistaEntrega) throw new Error("Usuario no encontrado.");
+
+            const tipoMovSalida = await tipoMovRepo.findOneBy({ nombre_tipo: 'Salida por Venta' });
+            if (!tipoMovSalida) throw new Error("Tipo de movimiento 'Salida por Venta' no encontrado.");
 
             for (const detalle of solicitud.detalles_solicitud) {
-                if (detalle.cantidad_aprobada_primaria === null || detalle.cantidad_aprobada_primaria <= 0) {
-                    continue; // Saltar ítems no aprobados o con cantidad cero
-                }
-                
-                // Cantidad a entregar es lo aprobado menos lo ya entregado (si hubiera entregas parciales, por ahora no)
+                if (detalle.cantidad_aprobada_primaria === null || detalle.cantidad_aprobada_primaria <= 0) continue;
+
                 const cantidadAEntregar = detalle.cantidad_aprobada_primaria - detalle.cantidad_entregada_primaria;
-                if (cantidadAEntregar <= 0) continue; // Ya se entregó todo lo aprobado para este ítem
+                if (cantidadAEntregar <= 0) continue;
 
+                const producto = detalle.producto;
 
-                // Re-verificar stock al momento de la entrega
-                const producto = detalle.producto; // Ya lo cargamos con la solicitud
-                if (producto.stock_actual < cantidadAEntregar) {
-                    throw new Error(`Stock insuficiente para el producto '${producto.nombre_producto}' al momento de la entrega. Necesario: ${cantidadAEntregar}, Disponible: ${producto.stock_actual}.`);
+                // VALIDACIÓN DE STOCK EN LA UBICACIÓN ESPECÍFICA
+                const stockEnUbicacion = await stockProductoRepo.findOneBy({ id_producto_fk: producto.id_producto, id_ubicacion_fk: id_ubicacion_origen });
+                if (!stockEnUbicacion || stockEnUbicacion.cantidad < cantidadAEntregar) {
+                    throw new Error(`Stock insuficiente para '${producto.nombre_producto}' en la ubicación '${ubicacionOrigen.nombre}'. Necesario: ${cantidadAEntregar}, Disponible: ${stockEnUbicacion?.cantidad || 0}.`);
                 }
 
-                // Crear Movimiento de Inventario
+                const stockAnteriorTotal = producto.stock_actual;
+
+                // 1. Actualizar stock en la ubicación y el total del producto
+                stockEnUbicacion.cantidad -= cantidadAEntregar;
+                producto.stock_actual -= cantidadAEntregar;
+                await tem.save(stockEnUbicacion);
+                await tem.save(producto);
+
+                // 2. Crear Movimiento de Inventario - AQUÍ ESTÁ LA CORRECCIÓN
                 const movimiento = new MovimientoInventario();
                 movimiento.producto = producto;
                 movimiento.tipo_movimiento = tipoMovSalida;
-                movimiento.cantidad_movida = cantidadAEntregar; // En la unidad primaria
-                movimiento.unidad_medida_movimiento = producto.unidad_medida_primaria; // La salida se registra en la unidad primaria
+                movimiento.cantidad_movida = cantidadAEntregar;
+                movimiento.unidad_medida_movimiento = producto.unidad_medida_primaria; // <-- AGREGADO
                 movimiento.cantidad_convertida_a_primaria = cantidadAEntregar;
-                movimiento.stock_anterior_primaria = producto.stock_actual;
-                movimiento.stock_nuevo_primaria = producto.stock_actual - cantidadAEntregar;
+                movimiento.stock_anterior_primaria = stockAnteriorTotal;
+                movimiento.stock_nuevo_primaria = producto.stock_actual;
                 movimiento.usuario = almacenistaEntrega;
+                movimiento.ubicacion = ubicacionOrigen;
                 movimiento.referencia_documento = `Solicitud #${solicitud.id_solicitud}`;
+                movimiento.detalle_solicitud_reserva = detalle;
                 if (notas_entrega) movimiento.notas_adicionales = notas_entrega;
-                movimiento.detalle_solicitud_reserva = detalle; // Enlazar con el detalle de la solicitud
+                await tem.save(movimiento);
 
-                await transactionalEntityManager.save(MovimientoInventario, movimiento);
-
-                // Actualizar stock del producto
-                producto.stock_actual = movimiento.stock_nuevo_primaria;
-                await transactionalEntityManager.save(Producto, producto);
-
-                // Actualizar cantidad entregada en el detalle de la solicitud
+                // 3. Actualizar cantidad entregada en el detalle
                 detalle.cantidad_entregada_primaria += cantidadAEntregar;
-                await transactionalEntityManager.save(DetalleSolicitudReserva, detalle);
+                await tem.save(detalle);
             }
 
             solicitud.estado_solicitud = 'Entregada';
             solicitud.fecha_entrega_efectiva = new Date();
-            // Si el que entrega es diferente al que procesó la aprobación, se podría actualizar:
-            // solicitud.almacenista_procesa = almacenistaEntrega; 
-            
-            if (notas_entrega) solicitud.notas_specificas_entrega = notas_entrega; // Asignar al nuevo campo
-            solicitud.estado_solicitud = 'Entregada';
-            solicitud.fecha_entrega_efectiva = new Date();
-            await transactionalEntityManager.save(SolicitudReserva, solicitud);
-            // Recargar para devolver el objeto completo
-            const solicitudActualizada = await solicitudRepository.findOne({
-                where: { id_solicitud: parseInt(idSolicitud) },
-                relations: ["vendedor", "almacenista_procesa", "detalles_solicitud", "detalles_solicitud.producto", "detalles_solicitud.unidad_medida_solicitada"]
-            });
+            await tem.save(solicitud);
 
-            res.status(200).json(solicitudActualizada);
+            res.status(200).json({ message: "Solicitud marcada como entregada y stock actualizado." });
             return;
 
         } catch (error) {
-            console.error("Error en transacción de entregarSolicitud:", error);
             if (!res.headersSent) {
-                if (error instanceof Error) {
-                    res.status(400).json({ message: error.message || "Error al marcar la solicitud como entregada." });
-                } else {
-                    res.status(500).json({ message: "Error desconocido al marcar la solicitud como entregada." });
-                }
-            }
-        }
-    }).catch(transactionError => {
-        console.error("Error de la transacción general en entregarSolicitud:", transactionError);
-        if (!res.headersSent) {
-            if (transactionError instanceof Error) {
-                res.status(500).json({ message: "Fallo la transacción al entregar solicitud.", error: transactionError.message });
-            } else {
-                res.status(500).json({ message: "Fallo la transacción al entregar solicitud con error desconocido." });
+                if (error instanceof Error) res.status(400).json({ message: error.message });
+                else res.status(500).json({ message: "Error desconocido al procesar la entrega." });
             }
         }
     });

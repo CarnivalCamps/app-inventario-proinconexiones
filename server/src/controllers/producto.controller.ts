@@ -1,6 +1,6 @@
 // server/src/controllers/producto.controller.ts
 
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../data-source";
 import { Producto } from "../entities/Producto";
 import { CategoriaProducto } from "../entities/CategoriaProducto";
@@ -8,6 +8,8 @@ import { UnidadMedida } from "../entities/UnidadMedida";
 import { Proveedor } from "../entities/Proveedor";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { ILike, Not } from "typeorm"; // Asegúrate de tener Not si lo usas en update
+import { StockProducto } from '../entities/StockProducto';
+import { Ubicacion } from "../entities/Ubicacion";
 
 export const getAllProductos = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -186,18 +188,19 @@ export const getProductoById = async (req: Request, res: Response): Promise<void
 
         if (!producto) {
             res.status(404).json({ message: "Producto no encontrado." });
-            return;
+            return; // Este sí es necesario para salir temprano
         }
+        
         res.status(200).json(producto);
-        return;
+        // No necesitas return aquí al final
     } catch (error) {
         console.error("Error en getProductoById:", error);
         if (error instanceof Error) {
             res.status(500).json({ message: "Error al obtener el producto.", error: error.message });
-            return;
+        } else {
+            res.status(500).json({ message: "Error al obtener el producto." });
         }
-        res.status(500).json({ message: "Error al obtener el producto." });
-        return;
+        // No necesitas return aquí al final
     }
 };
 
@@ -383,7 +386,94 @@ export const updateProducto = async (req: AuthRequest, res: Response): Promise<v
         return;
     }
 };
+export const getUbicacionesByProductoId = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const idProducto = parseInt(req.params.id);
+    if (isNaN(idProducto)) {
+      res.status(400).json({ message: "ID de producto inválido." });
+      return;
+    }
 
+    const stockRepository = AppDataSource.getRepository(StockProducto);
+    const stocks = await stockRepository.find({
+      where: { producto: { id_producto: idProducto } },
+      relations: ['ubicacion', 'producto'],
+    });
+
+    const ubicacionesUnicas = stocks
+      .map(stock => stock.ubicacion)
+      .filter(
+        (ubicacion, index, self) =>
+          ubicacion &&
+          self.findIndex(u => u.id_ubicacion === ubicacion.id_ubicacion) === index
+      )
+      .map(ubicacion => {
+        // Encontrar todos los stocks para esta ubicación
+        const stocksEnUbicacion = stocks.filter(s => s.ubicacion.id_ubicacion === ubicacion.id_ubicacion);
+        
+        return {
+          ...ubicacion,
+          productos_en_ubicacion: stocksEnUbicacion.map(stock => ({
+            id_producto: stock.producto.id_producto,
+            nombre_producto: stock.producto.nombre_producto,
+            cantidad: stock.cantidad,
+            sku: stock.producto.sku
+          }))
+        };
+      });
+
+    res.json(ubicacionesUnicas);
+  } catch (error: any) {
+    next(error);
+  }
+};
+export const updateProductoUbicaciones = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { ubicacionIds } = req.body; // Esperamos un array de IDs de ubicación
+
+    if (!Array.isArray(ubicacionIds)) {
+        res.status(400).json({ message: "Se esperaba un array de IDs de ubicación." });
+        return; // ✅ Cambiar la posición del return
+    }
+
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+        const idProducto = parseInt(id);
+
+        // 1. Eliminar TODAS las asignaciones de stock existentes para este producto.
+        // Esto es más simple y seguro que calcular diferencias.
+        await queryRunner.manager.delete(StockProducto, { producto: { id_producto: idProducto } });
+
+        // 2. Crear las nuevas asignaciones basadas en el array recibido.
+        for (const idUbicacion of ubicacionIds) {
+            const nuevoStock = new StockProducto();
+            nuevoStock.producto = { id_producto: idProducto } as Producto;
+            nuevoStock.ubicacion = { id_ubicacion: idUbicacion } as Ubicacion;
+            nuevoStock.cantidad = 0; // Se asigna la ubicación, pero el stock se ajustará con conteos o movimientos.
+            await queryRunner.manager.save(nuevoStock);
+        }
+
+        await queryRunner.commitTransaction();
+        res.status(200).json({ message: "Ubicaciones del producto actualizadas correctamente." });
+
+    } catch (error) {
+        await queryRunner.rollbackTransaction();
+        console.error("Error en updateProductoUbicaciones:", error);
+        res.status(500).json({ 
+            message: "Error al actualizar las ubicaciones del producto.", 
+            error: error instanceof Error ? error.message : "Error desconocido"
+        });
+    } finally {
+        await queryRunner.release();
+    }
+};
 export const deleteProducto = async (req: AuthRequest, res: Response): Promise<void> => {
     const { id } = req.params;
     try {
@@ -400,8 +490,8 @@ export const deleteProducto = async (req: AuthRequest, res: Response): Promise<v
     } catch (error) {
         console.error("Error en deleteProducto:", error);
         if (error instanceof Error && error.message.includes('violates foreign key constraint')) {
-             res.status(409).json({ message: "No se puede eliminar el producto porque tiene registros asociados.", error: error.message });
-             return;
+            res.status(409).json({ message: "No se puede eliminar el producto porque tiene registros asociados.", error: error.message });
+            return;
         }
         if (error instanceof Error) {
             res.status(500).json({ message: "Error al eliminar el producto.", error: error.message });
@@ -410,4 +500,25 @@ export const deleteProducto = async (req: AuthRequest, res: Response): Promise<v
         res.status(500).json({ message: "Error al eliminar el producto." });
         return;
     }
+};
+export const searchProductos = async (req: Request, res: Response): Promise<void> => {
+    const { termino } = req.query;
+
+    if (!termino || typeof termino !== 'string') {
+        res.status(400).json({ message: "Se requiere un 'termino' de búsqueda." });
+        return;
+    }
+
+    try {
+        const productoRepo = AppDataSource.getRepository(Producto);
+        const productos = await productoRepo.find({
+            where: [
+                { nombre_producto: ILike(`%${termino}%`) },
+                { sku: ILike(`%${termino}%`) }
+            ],
+            take: 10 // Limitar a 10 resultados para no sobrecargar
+        });
+        res.status(200).json(productos);
+        return;
+    } catch (error) { /* ... manejo de errores ... */ }
 };
